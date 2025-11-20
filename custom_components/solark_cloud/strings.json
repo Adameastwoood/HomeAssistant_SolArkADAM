@@ -2,37 +2,58 @@
   "config": {
     "step": {
       "user": {
-        "title": "Sol-Ark Cloud Configuration",
-        "description": "Enter your Sol-Ark Cloud credentials and configuration",
+        "title": "Sol-Ark Cloud Setup",
+        "description": "Connect to your Sol-Ark Cloud account. You'll need your MySolArk credentials and Plant ID.",
         "data": {
-          "username": "Email Address",
+          "email": "Email Address",
           "password": "Password",
           "plant_id": "Plant ID",
           "base_url": "Base URL",
           "auth_mode": "Authentication Mode",
           "scan_interval": "Update Interval (seconds)"
+        },
+        "data_description": {
+          "email": "The email address you use to log into MySolArk",
+          "password": "Your MySolArk account password",
+          "plant_id": "Your Plant ID from the MySolArk URL (e.g., 12345)",
+          "base_url": "API endpoint URL. Use default unless you have connection issues.",
+          "auth_mode": "Authentication method. 'Auto' tries all methods automatically.",
+          "scan_interval": "How often to update data (30-3600 seconds)."
         }
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect",
-      "invalid_auth": "Invalid credentials",
-      "unknown": "Unknown error"
+      "cannot_connect": "Cannot connect to Sol-Ark Cloud. Please check:\n• Your internet connection\n• The Base URL setting\n• Sol-Ark servers may be down\n\nDetails: {error}",
+      "invalid_auth": "Authentication failed. Please verify:\n• Your email address is correct\n• Your password is correct\n• Your MySolArk account is active\n• You can log in at www.mysolark.com\n\nDetails: {error}",
+      "invalid_plant_id": "Cannot access Plant ID. Please verify:\n• The Plant ID is correct (check your MySolArk URL)\n• You have permission to view this plant\n• The plant is active in your MySolArk account\n\nDetails: {error}",
+      "unknown": "An unexpected error occurred:\n{error}\n\nPlease check the Home Assistant logs for more details."
     },
     "abort": {
-      "already_configured": "Already configured"
+      "already_configured": "This Plant ID is already configured.",
+      "reauth_successful": "Re-authentication successful!"
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Sol-Ark Cloud Options",
+        "description": "Update settings for your Sol-Ark Cloud integration.",
         "data": {
           "base_url": "Base URL",
           "auth_mode": "Authentication Mode",
           "scan_interval": "Update Interval (seconds)"
+        },
+        "data_description": {
+          "base_url": "API endpoint URL. Try the alternative if you experience connection issues.",
+          "auth_mode": "Authentication method. Switch to 'Legacy' if 'Auto' fails.",
+          "scan_interval": "Update frequency in seconds (30-3600)."
         }
       }
+    },
+    "error": {
+      "cannot_connect": "Connection test failed with new settings.",
+      "invalid_auth": "Authentication test failed with new settings.",
+      "unknown": "Failed to validate new settings."
     }
   }
 }

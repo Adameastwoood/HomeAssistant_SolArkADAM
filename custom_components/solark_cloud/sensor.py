@@ -1,11 +1,14 @@
-"""Sensor platform for Sol-Ark Cloud integration."""
+"""Support for Sol-Ark Cloud sensors."""
 from __future__ import annotations
 
-import logging
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from homeassistant.components.sensor import (
+    SensorDeviceClass,
     SensorEntity,
+    SensorEntityDescription,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
@@ -15,16 +18,91 @@ from homeassistant.const import (
     UnitOfPower,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from . import SolArkDataUpdateCoordinator
+from .const import DOMAIN, CONF_PLANT_ID
+
+
+@dataclass
+class SolArkSensorEntityDescription(SensorEntityDescription):
+    """Describes Sol-Ark sensor entity."""
+
+    value_fn: Callable[[dict[str, Any]], Any] | None = None
+    attribute_fn: Callable[[dict[str, Any]], dict[str, Any]] | None = None
+
+
+SENSOR_TYPES: tuple[SolArkSensorEntityDescription, ...] = (
+    SolArkSensorEntityDescription(
+        key="pv_power",
+        name="PV Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.get("pac", 0),
+    ),
+    SolArkSensorEntityDescription(
+        key="load_power",
+        name="Load Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.get("familyLoadPower", 0),
+    ),
+    SolArkSensorEntityDescription(
+        key="grid_import_power",
+        name="Grid Import Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: max(0, data.get("gridPower", 0)),
+    ),
+    SolArkSensorEntityDescription(
+        key="grid_export_power",
+        name="Grid Export Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: abs(min(0, data.get("gridPower", 0))),
+    ),
+    SolArkSensorEntityDescription(
+        key="battery_power",
+        name="Battery Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.get("batPower", 0),
+        attribute_fn=lambda data: {
+            "status": (
+                "charging" if data.get("batPower", 0) < 0
+                else "discharging" if data.get("batPower", 0) > 0
+                else "idle"
+            )
+        },
+    ),
+    SolArkSensorEntityDescription(
+        key="battery_state_of_charge",
+        name="Battery State of Charge",
+        native_unit_of_measurement=PERCENTAGE,
+        device_class=SensorDeviceClass.BATTERY,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.get("soc", 0),
+    ),
+    SolArkSensorEntityDescription(
+        key="energy_today",
+        name="Energy Today",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda data: data.get("eToday", 0),
+    ),
+    SolArkSensorEntityDescription(
+        key="last_error",
+        name="Last Error",
+        value_fn=lambda data: data.get("lastError", "None"),
+    ),
 )
-
-from .const import DOMAIN, CONF_PLANT_ID, SENSOR_TYPES
-
-_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -32,107 +110,51 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Sol-Ark Cloud sensor based on a config entry."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    """Set up Sol-Ark sensors based on a config entry."""
+    coordinator: SolArkDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
     plant_id = entry.data[CONF_PLANT_ID]
 
-    entities = []
-    for sensor_type, sensor_info in SENSOR_TYPES.items():
-        entities.append(
-            SolArkCloudSensor(
-                coordinator=coordinator,
-                plant_id=plant_id,
-                sensor_type=sensor_type,
-                sensor_info=sensor_info,
-                entry_id=entry.entry_id,
-            )
-        )
+    entities = [
+        SolArkSensor(coordinator, description, plant_id)
+        for description in SENSOR_TYPES
+    ]
 
     async_add_entities(entities)
 
 
-class SolArkCloudSensor(CoordinatorEntity, SensorEntity):
-    """Representation of a Sol-Ark Cloud Sensor."""
+class SolArkSensor(CoordinatorEntity[SolArkDataUpdateCoordinator], SensorEntity):
+    """Representation of a Sol-Ark sensor."""
+
+    entity_description: SolArkSensorEntityDescription
+    _attr_has_entity_name = True
 
     def __init__(
         self,
-        coordinator: DataUpdateCoordinator,
+        coordinator: SolArkDataUpdateCoordinator,
+        description: SolArkSensorEntityDescription,
         plant_id: str,
-        sensor_type: str,
-        sensor_info: dict[str, Any],
-        entry_id: str,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
-        self._plant_id = plant_id
-        self._sensor_type = sensor_type
-        self._sensor_info = sensor_info
-        self._attr_name = f"Sol-Ark {sensor_info['name']}"
-        self._attr_unique_id = f"{entry_id}_{sensor_type}"
-        self._attr_icon = sensor_info["icon"]
-
-        # Set unit of measurement
-        if sensor_info["unit"] == "W":
-            self._attr_native_unit_of_measurement = UnitOfPower.WATT
-        elif sensor_info["unit"] == "kWh":
-            self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
-        elif sensor_info["unit"] == "%":
-            self._attr_native_unit_of_measurement = PERCENTAGE
-        else:
-            self._attr_native_unit_of_measurement = sensor_info["unit"]
-
-        # Set device class and state class
-        self._attr_device_class = sensor_info.get("device_class")
-        if sensor_info.get("state_class"):
-            self._attr_state_class = SensorStateClass(sensor_info["state_class"])
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device information about this entity."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._plant_id)},
-            name=f"Sol-Ark Plant {self._plant_id}",
-            manufacturer="Sol-Ark",
-            model="Sol-Ark Inverter",
-            configuration_url="https://www.mysolark.com",
-        )
+        self.entity_description = description
+        self._attr_unique_id = f"{plant_id}_{description.key}"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, plant_id)},
+            "name": f"Sol-Ark Plant {plant_id}",
+            "manufacturer": "Sol-Ark",
+            "model": "Cloud Integration",
+        }
 
     @property
     def native_value(self) -> Any:
         """Return the state of the sensor."""
-        if self.coordinator.data is None:
-            return None
-        
-        value = self.coordinator.data.get(self._sensor_type)
-        
-        # Handle special cases
-        if self._sensor_type == "battery_power":
-            # Positive = discharge, Negative = charge
-            if value is not None:
-                return float(value)
-        
-        return value
+        if self.coordinator.data and self.entity_description.value_fn:
+            return self.entity_description.value_fn(self.coordinator.data)
+        return None
 
     @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return self.coordinator.last_update_success
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return additional state attributes."""
-        attrs = {
-            "plant_id": self._plant_id,
-            "last_update": self.coordinator.last_update_success_time,
-        }
-        
-        # Add helpful description for battery power
-        if self._sensor_type == "battery_power" and self.native_value is not None:
-            if self.native_value > 0:
-                attrs["status"] = "discharging"
-            elif self.native_value < 0:
-                attrs["status"] = "charging"
-            else:
-                attrs["status"] = "idle"
-        
-        return attrs
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return additional attributes."""
+        if self.coordinator.data and self.entity_description.attribute_fn:
+            return self.entity_description.attribute_fn(self.coordinator.data)
+        return None
