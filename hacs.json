@@ -1,5 +1,7 @@
 {
-  "name": "Sol-Ark Cloud",
+  "name": "SolArk Cloud",
+  "content_in_root": false,
   "render_readme": true,
-  "domains": ["sensor"]
+  "homeassistant": "2024.1.0b0",
+  "country": "US"
 }

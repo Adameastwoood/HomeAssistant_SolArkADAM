@@ -1,0 +1,50 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "SolArk Cloud",
+        "description": "Enter your SolArk Cloud credentials and plant ID.",
+        "data": {
+          "username": "Username (email)",
+          "password": "Password",
+          "plant_id": "Plant ID",
+          "base_url": "Base URL",
+          "api_url": "API URL"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to SolArk API.",
+      "auth_failed": "Authentication failed. Check credentials.",
+      "unknown": "Unexpected error occurred."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "pv_power": {
+        "name": "PV Power"
+      },
+      "load_power": {
+        "name": "Load Power"
+      },
+      "grid_import_power": {
+        "name": "Grid Import Power"
+      },
+      "grid_export_power": {
+        "name": "Grid Export Power"
+      },
+      "battery_power": {
+        "name": "Battery Power"
+      },
+      "battery_soc": {
+        "name": "Battery SOC"
+      },
+      "energy_today": {
+        "name": "Energy Today"
+      },
+      "last_error": {
+        "name": "SolArk Last Error"
+      }
+    }
+  }
+}
