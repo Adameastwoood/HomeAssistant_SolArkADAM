@@ -1,0 +1,151 @@
+# Example SolArk dashboard view for Home Assistant
+#
+# Usage:
+# 1. Open your dashboard -> three dots -> Edit dashboard -> Raw configuration editor.
+# 2. Merge this view under the top-level `views:` list.
+#
+# Make sure the entity IDs match your actual SolArk sensors (rename if needed).
+
+title: SolArk
+path: solark
+icon: mdi:solar-power
+cards:
+  - type: vertical-stack
+    cards:
+      - type: custom:mushroom-chips-card
+        chips:
+          - type: template
+            entity: sensor.solark_battery_soc
+            content: >-
+              Battery {{ states('sensor.solark_battery_soc') }}%
+            icon: mdi:battery
+            icon_color: >-
+              {% set soc = states('sensor.solark_battery_soc')|float(0) %}
+              {% if soc >= 80 %}green
+              {% elif soc >= 40 %}orange
+              {% else %}red
+              {% endif %}
+          - type: template
+            entity: sensor.solark_pv_power
+            content: >-
+              PV {{ states('sensor.solark_pv_power') }} W
+            icon: mdi:solar-power
+            icon_color: yellow
+          - type: template
+            entity: sensor.solark_load_power
+            content: >-
+              Load {{ states('sensor.solark_load_power') }} W
+            icon: mdi:home-lightning-bolt
+            icon_color: blue
+          - type: template
+            entity: sensor.solark_grid_power
+            content: >-
+              Grid {{ states('sensor.solark_grid_power') }} W
+            icon: mdi:transmission-tower
+            icon_color: >-
+              {% set g = states('sensor.solark_grid_power')|float(0) %}
+              {% if g > 0 %}orange{% elif g < 0 %}green{% else %}grey{% endif %}
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          # PV
+          - type: custom:mushroom-template-card
+            entity: sensor.solark_pv_power
+            primary: "PV"
+            secondary: >-
+              {{ states('sensor.solark_pv_power') }} W
+            icon: mdi:solar-power
+            icon_color: >-
+              {% set pv = states('sensor.solark_pv_power')|float(0) %}
+              {% if pv > 0 %}yellow{% else %}grey{% endif %}
+
+          # Load
+          - type: custom:mushroom-template-card
+            entity: sensor.solark_load_power
+            primary: "Load"
+            secondary: >-
+              {{ states('sensor.solark_load_power') }} W
+            icon: mdi:home-lightning-bolt
+            icon_color: >-
+              {% set load = states('sensor.solark_load_power')|float(0) %}
+              {% if load > 0 %}blue{% else %}grey{% endif %}
+
+          # Battery with direction
+          - type: custom:mushroom-template-card
+            entity: sensor.solark_battery_soc
+            primary: >-
+              Battery {{ states('sensor.solark_battery_soc') }}%
+            secondary: >-
+              {% set p = states('sensor.solark_battery_power')|float(0) %}
+              {% if p > 0 %}
+                Discharging {{ p | round(0) }} W → Load
+              {% elif p < 0 %}
+                Charging {{ (p * -1) | round(0) }} W
+              {% else %}
+                Idle
+              {% endif %}
+            icon: >-
+              {% set soc = states('sensor.solark_battery_soc')|float(0) %}
+              {% if soc >= 80 %}
+                mdi:battery
+              {% elif soc >= 60 %}
+                mdi:battery-80
+              {% elif soc >= 40 %}
+                mdi:battery-60
+              {% elif soc >= 20 %}
+                mdi:battery-40
+              {% else %}
+                mdi:battery-20
+              {% endif %}
+            icon_color: >-
+              {% set soc = states('sensor.solark_battery_soc')|float(0) %}
+              {% if soc >= 80 %}green
+              {% elif soc >= 40 %}orange
+              {% else %}red
+              {% endif %}
+
+          # Grid with direction
+          - type: custom:mushroom-template-card
+            entity: sensor.solark_grid_power
+            primary: "Grid"
+            secondary: >-
+              {% set g = states('sensor.solark_grid_power')|float(0) %}
+              {% if g > 0 %}
+                Importing {{ g | round(0) }} W
+              {% elif g < 0 %}
+                Exporting {{ (g * -1) | round(0) }} W
+              {% else %}
+                Idle
+              {% endif %}
+            icon: mdi:transmission-tower
+            icon_color: >-
+              {% set g = states('sensor.solark_grid_power')|float(0) %}
+              {% if g > 0 %}
+                orange
+              {% elif g < 0 %}
+                green
+              {% else %}
+                grey
+              {% endif %}
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:mushroom-template-card
+            entity: sensor.solark_energy_today
+            primary: "Energy Today"
+            secondary: >-
+              {{ states('sensor.solark_energy_today') }} kWh
+            icon: mdi:calendar-today
+            icon_color: teal
+
+          - type: custom:mushroom-template-card
+            entity: sensor.solark_energy_total
+            primary: "Energy Total"
+            secondary: >-
+              {{ states('sensor.solark_energy_total') }} kWh
+            icon: mdi:chart-line
+            icon_color: indigo
