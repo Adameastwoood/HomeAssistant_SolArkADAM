@@ -547,28 +547,42 @@ class SolArkCloudAPI:
         if "loadOrEpsPower" in data:
             sensors["load_power"] = self._safe_float(data.get("loadOrEpsPower"))
 
-        # ----- Grid import/export from meterA/B/C -----
-        meter_a = self._safe_float(data.get("meterA"))
-        meter_b = self._safe_float(data.get("meterB"))
-        meter_c = self._safe_float(data.get("meterC"))
-        grid_net = meter_a + meter_b + meter_c
+       # ----- Grid import/export -----
+# Priority 1: Use meter readings if meters exist and have data
+meter_a = self._safe_float(data.get("meterA"))
+meter_b = self._safe_float(data.get("meterB"))
+meter_c = self._safe_float(data.get("meterC"))
+grid_net = meter_a + meter_b + meter_c
+exists_meter = data.get("existsMeter", False)
 
-        if grid_net != 0.0:
-            if grid_net > 0:
-                sensors["grid_import_power"] = grid_net
-                sensors["grid_export_power"] = 0.0
-            else:
-                sensors["grid_import_power"] = 0.0
-                sensors["grid_export_power"] = abs(grid_net)
-        else:
-            if "gridImportPower" in data:
-                sensors["grid_import_power"] = self._safe_float(
-                    data.get("gridImportPower")
-                )
-            if "gridExportPower" in data:
-                sensors["grid_export_power"] = self._safe_float(
-                    data.get("gridExportPower")
-                )
+if exists_meter and grid_net != 0.0:
+    # Meters are installed and reporting non-zero
+    if grid_net > 0:
+        sensors["grid_import_power"] = grid_net
+        sensors["grid_export_power"] = 0.0
+    else:
+        sensors["grid_import_power"] = 0.0
+        sensors["grid_export_power"] = abs(grid_net)
+elif exists_meter and grid_net == 0.0:
+    # Meters exist but reading zero - trust it
+    sensors["grid_import_power"] = 0.0
+    sensors["grid_export_power"] = 0.0
+else:
+    # Priority 2: No meters - use flow direction flags
+    grid_power_val = self._safe_float(data.get("gridOrMeterPower"))
+    grid_to = data.get("gridTo", False)
+    to_grid = data.get("toGrid", False)
+
+    if grid_to:
+        sensors["grid_import_power"] = grid_power_val
+        sensors["grid_export_power"] = 0.0
+    elif to_grid:
+        sensors["grid_import_power"] = 0.0
+        sensors["grid_export_power"] = grid_power_val
+    else:
+        # Priority 3: Explicit keys as last resort
+        sensors["grid_import_power"] = self._safe_float(data.get("gridImportPower", 0.0))
+        sensors["grid_export_power"] = self._safe_float(data.get("gridExportPower", 0.0))
 
         # Ensure keys always exist
         sensors.setdefault("pv_power", 0.0)
