@@ -440,8 +440,9 @@ class SolArkCloudAPI:
                 _LOGGER.debug("Merging flow_data keys into live_data: %s", list(flow_data.keys()))
                 for k, v in flow_data.items():
                     # Do not overwrite energyToday/Total if already present
-                    if k in ("pvPower", "battPower", "gridOrMeterPower", "loadOrEpsPower", "soc"):
-                        live_data[k] = v
+                  if k in ("pvPower", "battPower", "gridOrMeterPower", "loadOrEpsPower", "soc", 
+                           "gridTo", "toGrid", "existsMeter"):
+                               live_data[k] = v
         except Exception as e:  # noqa: BLE001
             _LOGGER.warning("Unable to merge flow data into live data: %s", e)
 
